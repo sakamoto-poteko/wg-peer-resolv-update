@@ -6,6 +6,10 @@
 #ifndef WIREGUARD_H
 #define WIREGUARD_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <net/if.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -101,5 +105,9 @@ bool wg_key_is_zero(const wg_key key);
 void wg_generate_public_key(wg_key public_key, const wg_key private_key);
 void wg_generate_private_key(wg_key private_key);
 void wg_generate_preshared_key(wg_key preshared_key);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

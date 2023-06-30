@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.4)
 project(wg-peer-resolv-update)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -6,7 +6,8 @@ set(CMAKE_C_STANDARD 99)
 
 add_executable(wg-peer-resolv-update
         main.cpp
-#        wireguard.c
-#        wireguard.h
-#        wireguard.hpp
-        )
+        core.cpp
+        core.h
+        wireguard.c
+        wireguard.h
+)
