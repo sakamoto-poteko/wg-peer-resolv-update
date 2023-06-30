@@ -7,6 +7,8 @@
 
 int main(int argc, char **argv)
 {
+    openlog("wg-autodns", LOG_PERROR, LOG_DAEMON);
+
     const char *peer_pubkey_b64 = "7wPZD1C9uVV4LSutzPdg6Egxp+F9b7Wdl/edki0VXgs=";
     wg_key peer_pubkey;
 
@@ -22,7 +24,7 @@ int main(int argc, char **argv)
                   << std::endl;
     }
 
-    rc = update_peer_ip("wgtest", &peer_pubkey, addrs);
+    rc = update_peer_ip("wgdns", &peer_pubkey, addrs, 22222);
 
     return 0;
 }

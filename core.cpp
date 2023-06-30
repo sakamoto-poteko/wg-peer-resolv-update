@@ -19,8 +19,23 @@ bool is_addr_same(const sockaddr *a, const sockaddr *b)
     }
 }
 
+const sockaddr *get_first_address(bool prefer_v4, const std::vector<sockaddr_storage> &addresses)
+{
+    if (addresses.empty()) {
+        return nullptr;
+    }
+
+    for (const sockaddr_storage &addr : addresses) {
+        if (addr.ss_family == prefer_v4 ? AF_INET : AF_INET6) {
+            return reinterpret_cast<const sockaddr *>(&addr);
+        }
+    }
+    return reinterpret_cast<const sockaddr *>(&addresses.at(0));
+}
+
+// if the port of the peer is already set, the port param has no use
 int update_peer_ip(const char *if_name, const wg_key *peer_pubkey,
-    const std::vector<sockaddr_storage> &addresses)
+    const std::vector<sockaddr_storage> &addresses, std::uint16_t port)
 {
     // get peer addr
     // cond 1: if peer addr matches any addr in addresses, no op
@@ -53,9 +68,55 @@ int update_peer_ip(const char *if_name, const wg_key *peer_pubkey,
 
             // no matched ip?
             // set to first
-            // if existing endpoint is v4, use first v4 in addr
-            // if existing endpoint is v6, use first v6 in addr
-            // if no existing endpoint, use first v4
+
+            const sockaddr *target = nullptr;
+            switch (peer->endpoint.addr.sa_family) {
+            // if no existing endpoint, use first v4, then v6
+            // if existing endpoint is v4, use first v4, then v6
+            case AF_UNSPEC:
+            case AF_INET:
+                target = get_first_address(true, addresses);
+                break;
+            // if existing endpoint is v6, use first v6, then v4
+            case AF_INET6:
+                target = get_first_address(false, addresses);
+                break;
+            default:
+                syslog(LOG_CRIT, "unexpected protocol type: %d. report this bug: " __FILE__ ":%d", peer->endpoint.addr.sa_family, __LINE__);
+                rc = -EPROTONOSUPPORT;
+                goto update_peer_cleanup;
+            }
+
+            // target is not supposed to be nullptr
+            // the only way to make it null is to pass empty addr list, but addr list won't be empty here
+
+            char original_ip[INET6_ADDRSTRLEN];
+            char new_ip[INET6_ADDRSTRLEN];
+            const char *ori_ip_ok = inet_ntop(peer->endpoint.addr.sa_family, &reinterpret_cast<const sockaddr_in *>(&peer->endpoint.addr)->sin_addr, original_ip, INET6_ADDRSTRLEN);
+            const char *new_ip_ok = inet_ntop(target->sa_family, &reinterpret_cast<const sockaddr_in *>(target)->sin_addr, new_ip, INET6_ADDRSTRLEN);
+
+            syslog(LOG_INFO, "peer of wg %s, original ip %s, new ip %s", if_name, ori_ip_ok ? original_ip : "(N/A)", new_ip_ok ? new_ip : "(N/A)");
+
+            switch (target->sa_family) {
+            case AF_INET:
+                std::memcpy(&peer->endpoint.addr4, target, sizeof(sockaddr_in));
+                peer->endpoint.addr4.sin_port = htons(port);
+                break;
+            case AF_INET6:
+                std::memcpy(&peer->endpoint.addr6, target, sizeof(sockaddr_in6));
+                peer->endpoint.addr6.sin6_port = htons(port);
+                break;
+            default:
+                syslog(LOG_CRIT, "Invalid socket type: %d", target->sa_family);
+                rc = -EPFNOSUPPORT;
+                goto update_peer_cleanup;
+            }
+
+            rc = wg_set_device(device);
+            if (rc < 0) {
+                syslog(LOG_ERR, "set wireguard peer failed: %s", std::strerror(-rc));
+                goto update_peer_cleanup;
+            }
         }
     }
 
