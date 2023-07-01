@@ -22,6 +22,8 @@ jobs:
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config Release
 
+    - run: ls ${{github.workspace}}/build/*
+    - run: ls ${{github.workspace}}/build/*/
     - name: Archive
       uses: actions/upload-artifact@v3
       with:
