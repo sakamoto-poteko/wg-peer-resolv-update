@@ -22,11 +22,9 @@ jobs:
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config Release
 
-    - run: ls ${{github.workspace}}/build/*
-    - run: ls ${{github.workspace}}/build/*/
     - name: Archive
       uses: actions/upload-artifact@v3
       with:
         name: bin-${{matrix.target}}
-        path: ${{github.workspace}}/build/wg-peer-resolv-update
+        path: ${{github.workspace}}/build/*
         if-no-files-found: error
