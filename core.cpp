@@ -24,7 +24,7 @@ static const sockaddr *get_first_address(bool prefer_v4, const std::vector<socka
 static bool is_addr_same(const sockaddr *a, const sockaddr *b);
 static bool get_address_str(const sockaddr *addr, std::string &str);
 static int update_peer_ip(const std::string &if_name, const wg_key *peer_pubkey,
-    const std::vector<sockaddr_storage> &addresses, std::uint16_t port);
+    const std::vector<sockaddr_storage> &addresses, std::uint16_t port, IPVersionPreference config_ip_version_preference);
 static int resolve_dns(const std::string &peer_dns, std::vector<sockaddr_storage> &addresses);
 
 bool is_addr_same(const sockaddr *a, const sockaddr *b)
@@ -42,15 +42,26 @@ bool is_addr_same(const sockaddr *a, const sockaddr *b)
 const sockaddr *get_first_address(bool prefer_v4, const std::vector<sockaddr_storage> &addresses)
 {
     if (addresses.empty()) {
+        syslog(LOG_DEBUG, "No address offered");
         return nullptr;
     }
+    const sockaddr *sock_addr = nullptr;
 
+    // set a fallback first
+    sock_addr = reinterpret_cast<const sockaddr *>(&addresses.at(0));
+
+    // then find if there's any interested
     for (const sockaddr_storage &addr : addresses) {
-        if (addr.ss_family == prefer_v4 ? AF_INET : AF_INET6) {
-            return reinterpret_cast<const sockaddr *>(&addr);
+        if (addr.ss_family == (prefer_v4 ? AF_INET : AF_INET6)) {
+            sock_addr = reinterpret_cast<const sockaddr *>(&addr);
+            break;
         }
     }
-    return reinterpret_cast<const sockaddr *>(&addresses.at(0));
+
+    std::string ip_str;
+    get_address_str(sock_addr, ip_str);
+    syslog(LOG_DEBUG, "%s address offered: %s", sock_addr->sa_family == AF_INET ? "IPv4" : "IPv6", ip_str.c_str());
+    return sock_addr;
 }
 
 bool get_address_str(const sockaddr *addr, std::string &str)
@@ -79,7 +90,7 @@ bool get_address_str(const sockaddr *addr, std::string &str)
 
 // if the port of the peer is already set, the port param has no use
 int update_peer_ip(const std::string &if_name, const wg_key *peer_pubkey,
-    const std::vector<sockaddr_storage> &addresses, std::uint16_t port)
+    const std::vector<sockaddr_storage> &addresses, std::uint16_t port, IPVersionPreference config_ip_version_preference)
 {
     // get peer addr
     // cond 1: if peer addr matches any addr in addresses, no op
@@ -116,23 +127,34 @@ int update_peer_ip(const std::string &if_name, const wg_key *peer_pubkey,
             // no matched ip?
             // set to first
 
-            const sockaddr *target = nullptr;
-            switch (peer->endpoint.addr.sa_family) {
-            // if no existing endpoint, use first v4, then v6
-            // if existing endpoint is v4, use first v4, then v6
-            case AF_UNSPEC:
-            case AF_INET:
-                target = get_first_address(true, addresses);
-                break;
-            // if existing endpoint is v6, use first v6, then v4
-            case AF_INET6:
-                target = get_first_address(false, addresses);
-                break;
-            default:
-                syslog(LOG_CRIT, "Unexpected protocol type: %d. Report this bug: " __FILE__ ":%d", peer->endpoint.addr.sa_family, __LINE__);
-                rc = -EPROTONOSUPPORT;
-                goto update_peer_cleanup;
+            IPVersionPreference current_ip_ver_pref = IPVersionPreference::NoPreference;
+
+            if (config_ip_version_preference == IPVersionPreference::NoPreference) {
+                switch (peer->endpoint.addr.sa_family) {
+                // if no existing endpoint, use first v4, then v6
+                // if existing endpoint is v4, use first v4, then v6
+                case AF_UNSPEC:
+                case AF_INET:
+                    syslog(LOG_INFO, "original IP is IPv4, while config has no preference. Use v4");
+                    current_ip_ver_pref = IPVersionPreference::PreferV4;
+                    break;
+                // if existing endpoint is v6, use first v6, then v4
+                case AF_INET6:
+                    syslog(LOG_INFO, "original IP is IPv6, while config has no preference. Use v6");
+                    current_ip_ver_pref = IPVersionPreference::PreferV6;
+                    break;
+                default:
+                    syslog(LOG_CRIT, "Unexpected protocol type: %d. Report this bug: " __FILE__ ":%d", peer->endpoint.addr.sa_family, __LINE__);
+                    rc = -EPROTONOSUPPORT;
+                    goto update_peer_cleanup;
+                }
+            } else {
+                syslog(LOG_INFO, "Config prefers %s", get_ip_version_preference_str(config_ip_version_preference));
+                current_ip_ver_pref = config_ip_version_preference;
             }
+
+            // ip_ver_pref is either v4 or v6 now
+            const sockaddr *target = get_first_address(current_ip_ver_pref == IPVersionPreference::PreferV4, addresses);
 
             // target is not supposed to be nullptr
             // the only way to make it null is to pass empty addr list, but addr list won't be empty here
@@ -225,11 +247,25 @@ resolve_dns_cleanup:
     return rc;
 }
 
+const char *get_ip_version_preference_str(IPVersionPreference pref)
+{
+    switch (pref) {
+    case IPVersionPreference::NoPreference:
+        return "no preference";
+    case IPVersionPreference::PreferV4:
+        return "IPv4";
+    case IPVersionPreference::PreferV6:
+        return "IPv6";
+    default:
+        return "Unknown";
+    }
+}
+
 void task_resolve_and_update(const ResolvUpdateConfig &config)
 {
     syslog(LOG_INFO, "Starting resolve and update task...");
-    syslog(LOG_INFO, "Target WireGuard device %s, peer key %s, target hostname %s, target port %u",
-        config.wg_device_name.c_str(), config.wg_peer_pubkey_base64.c_str(), config.peer_hostname.c_str(), config.peer_port);
+    syslog(LOG_INFO, "Target WireGuard device %s, peer key %s", config.wg_device_name.c_str(), config.wg_peer_pubkey_base64.c_str());
+    syslog(LOG_INFO, "target hostname %s, target port %u, endpoint preference: %s", config.peer_hostname.c_str(), config.peer_port, get_ip_version_preference_str(config.ip_version_preference));
 
     int rc = 0;
     while (true) {
@@ -264,7 +300,7 @@ void task_resolve_and_update(const ResolvUpdateConfig &config)
             }
         }
 
-        rc = update_peer_ip(config.wg_device_name.c_str(), &config.wg_peer_pubkey, addrs, config.peer_port);
+        rc = update_peer_ip(config.wg_device_name.c_str(), &config.wg_peer_pubkey, addrs, config.peer_port, config.ip_version_preference);
         if (rc < 0) {
             if (rc = -ENOENT) {
                 // no such device

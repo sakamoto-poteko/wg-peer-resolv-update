@@ -1,4 +1,4 @@
-WireGuard Peer Address Auto Updater
+Update WireGuard Peer endpoint with DNS Periodically
 ==============================
 
 
@@ -7,3 +7,5 @@ License
 
 Because this uses code from embeddable-wg-library, the project is licensed
 under the LGPL-2.1+.
+
+Git versioning utility is by written [Andrew Hardin](https://github.com/andrew-hardin/cmake-git-version-tracking).

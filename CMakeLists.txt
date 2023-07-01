@@ -12,11 +12,18 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-add_executable(wg-peer-resolv-update
+set(PRE_CONFIGURE_FILE "version/git.c.in")
+set(POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/git.c")
+include(cmake/git_watcher.cmake)
+
+add_executable(${PROJECT_NAME}
         main.cpp
         core.cpp
         core.h
         wireguard.c
         wireguard.h
+        ${POST_CONFIGURE_FILE}
 )
-target_link_libraries(wg-peer-resolv-update PRIVATE Threads::Threads)
+add_dependencies(${PROJECT_NAME} check_git)
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
