@@ -27,5 +27,5 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: bin-${{matrix.target}}
-        path: ${{github.workspace}}/build/*
+        path: build/wg-peer-resolv-update
         if-no-files-found: error
