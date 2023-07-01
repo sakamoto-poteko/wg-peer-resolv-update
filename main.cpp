@@ -103,7 +103,7 @@ void parse_args(int argc, char **argv, ResolvUpdateConfig &config)
             config.prefer_ipv4 = false;
             break;
 
-        case 'v':
+        case 'D':
             config.debug = true;
             break;
 
@@ -111,12 +111,11 @@ void parse_args(int argc, char **argv, ResolvUpdateConfig &config)
             config.frontend = true;
             break;
 
+        default:
+            fprintf(stderr, "?? getopt returned character code 0%o ??\n", c);
         case '?':
             // unknown option
             exit(EXIT_FAILURE);
-        default:
-            fprintf(stderr, "?? getopt returned character code 0%o ??\n", c);
-            break;
         }
     }
 
