@@ -9,25 +9,24 @@
 #include "core.h"
 #include "version/git.h"
 
-#define USAGE_SHORT                                                                       \
-    "Usage: %s -d wg_device -k peer_pubkey -h hostname -p port [-i interval] [-4] [-6]\n" \
-    "       [-D] [-f] [-v] [--help]\n"
-
 void print_help_short(const char *me)
 {
-    std::fprintf(stderr, USAGE_SHORT, me);
+    std::fprintf(stderr,
+        "Usage: %s -d wg_device -k peer_pubkey -h hostname -p port [-i interval] [-4] [-6]\n"
+        "       [-D] [-f] [-v] [--help]\n",
+        me);
 }
 
 void print_help_long_and_exit(const char *me)
 {
+    print_help_short(me);
     std::fprintf(stderr,
-        USAGE_SHORT,
         "Periodically checks and updates WireGuard peer endpoint IP against hostname."
-        "\n",
+        "\n"
         "   -d, --device        the WireGuard device which has the peer whose endpoint is to be updated\n"
         "   -k, --pubkey        the public key of the peer whose endpoint is to be updated\n"
-        "   -h, --hostname      the hostname of the peer endpoint, which will be periodically resolved\n",
-        "   -p, --port          the port of the endpoint\n",
+        "   -h, --hostname      the hostname of the peer endpoint, which will be periodically resolved\n"
+        "   -p, --port          the port of the endpoint\n"
         "   -i, --interval      the interval between hostname resolution\n"
         "   -4, --prefer-ipv4   prefer IPv4\n"
         "   -6, --prefer-ipv6   prefer IPv6\n"
@@ -36,8 +35,7 @@ void print_help_long_and_exit(const char *me)
         "   -v, --version       Print the version info\n"
         "   --help              Print this help\n"
         "\n"
-        "Report bugs on https://github.com/sakamoto-poteko/wg-peer-resolv-update, or mail to Afa <afa@afa.moe>\n",
-        me);
+        "Report bugs on https://github.com/sakamoto-poteko/wg-peer-resolv-update/issues, or mail to Afa <afa@afa.moe>\n");
     exit(EXIT_SUCCESS);
 }
 

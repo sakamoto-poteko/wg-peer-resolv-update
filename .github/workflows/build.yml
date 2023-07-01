@@ -16,6 +16,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - run: git config --global --add safe.directory .
+
     - run: mkdir build
 
     - name: Configure CMake
