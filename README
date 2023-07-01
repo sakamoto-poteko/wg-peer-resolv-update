@@ -1,0 +1,9 @@
+WireGuard Peer Address Auto Updater
+==============================
+
+
+License
+-------
+
+Because this uses code from embeddable-wg-library, the project is licensed
+under the LGPL-2.1+.
