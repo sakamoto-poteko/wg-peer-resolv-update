@@ -17,17 +17,20 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - run: mkdir build
+
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
+      run: cmake --build build --config Release
     - run: pwd
+    
     - run: ls build
-    - run: ls ${{github.workspace}}/build
+
     - name: Archive
       uses: actions/upload-artifact@v3
       with:
         name: bin-${{matrix.target}}
-        path: ${{github.workspace}}/build
+        path: build/wg-peer-resolv-update
         if-no-files-found: error
