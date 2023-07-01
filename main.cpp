@@ -34,7 +34,7 @@ void parse_args(int argc, char **argv, ResolvUpdateConfig &config)
         { "interval", required_argument, nullptr, 'i' },
         { "prefer-ipv4", no_argument, nullptr, '4' },
         { "prefer-ipv6", no_argument, nullptr, '6' },
-        { "verbose", no_argument, nullptr, 'v' },
+        { "debug", no_argument, nullptr, 'D' },
         { "frontend", no_argument, nullptr, 'f' },
         { "version", no_argument, nullptr, 'V' },
         { 0, 0, 0, 0 }
@@ -42,7 +42,7 @@ void parse_args(int argc, char **argv, ResolvUpdateConfig &config)
 
     while (1) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "Vd:k:h:p:i:46vf", long_options, &option_index);
+        c = getopt_long(argc, argv, "Vd:k:h:p:i:46Df", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -104,17 +104,16 @@ void parse_args(int argc, char **argv, ResolvUpdateConfig &config)
             break;
 
         case 'v':
-            config.verbose = true;
+            config.debug = true;
             break;
 
         case 'f':
             config.frontend = true;
-            fprintf(stderr, "Running in frontend\n");
             break;
 
         case '?':
-            break;
-
+            // unknown option
+            exit(EXIT_FAILURE);
         default:
             fprintf(stderr, "?? getopt returned character code 0%o ??\n", c);
             break;
@@ -159,13 +158,20 @@ int main(int argc, char **argv)
     };
 
     parse_args(argc, argv, config);
+    int rc = 0;
     if (config.frontend) {
-        openlog(argv[0], LOG_PERROR, LOG_DAEMON);
+        openlog(argv[0], LOG_PERROR, LOG_USER);
+        syslog(LOG_INFO, "Running in frontend\n");
     } else {
-        openlog(argv[0], 0, LOG_USER);
+        openlog(argv[0], 0, LOG_DAEMON);
+        rc = daemon(0, 0);
+        if (rc != 0) {
+            syslog(LOG_CRIT, "Daemonize failed: %s", std::strerror(errno));
+            exit(EXIT_FAILURE);
+        }
     }
 
-    if (config.verbose) {
+    if (config.debug) {
         setlogmask(LOG_UPTO(LOG_DEBUG));
     } else {
         setlogmask(LOG_UPTO(LOG_INFO));

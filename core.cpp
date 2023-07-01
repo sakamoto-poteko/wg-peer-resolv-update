@@ -1,9 +1,10 @@
-#include <atomic>
 #include <cerrno>
-#include <chrono>
-#include <condition_variable>
 #include <csignal>
 #include <cstring>
+
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <mutex>
 #include <set>
 #include <sstream>
@@ -243,7 +244,7 @@ void task_resolve_and_update(const ResolvUpdateConfig &config)
             goto task_resolve_and_update_loop_end;
         }
 
-        if (config.verbose) {
+        if (config.debug) {
             if (addrs.empty()) {
                 syslog(LOG_DEBUG, "No IP found for host %s", config.peer_hostname.c_str());
             } else {

@@ -2,6 +2,7 @@
 #define CORE_H
 
 #include <cstdint>
+
 #include <string>
 #include <vector>
 
@@ -19,7 +20,7 @@ struct ResolvUpdateConfig {
     std::uint16_t peer_port;
     bool prefer_ipv4;
     std::uint64_t refresh_interval_ms;
-    bool verbose;
+    bool debug;
     bool frontend;
 };
 
