@@ -1,30 +1,177 @@
+#include <csignal>
+#include <cstring>
 #include <iostream>
 
+#include <getopt.h>
 #include <syslog.h>
 #include <unistd.h>
 
 #include "core.h"
 
+void print_version()
+{
+    std::fprintf(stderr, "VERSION PLACEHOLDER\n");
+}
+
+void parse_args(int argc, char **argv, ResolvUpdateConfig &config)
+{
+    bool device_set = false;
+    bool pubkey_set = false;
+    bool host_set = false;
+    bool port_set = false;
+    unsigned long interval = 0;
+    unsigned long port = 0;
+
+    int c;
+    char *int_end_ptr = nullptr;
+
+    wg_key peer_pubkey;
+    static struct option long_options[] = {
+        { "device", required_argument, nullptr, 'd' },
+        { "pubkey", required_argument, nullptr, 'k' },
+        { "host", required_argument, nullptr, 'h' },
+        { "port", required_argument, nullptr, 'p' },
+        { "interval", required_argument, nullptr, 'i' },
+        { "prefer-ipv4", no_argument, nullptr, '4' },
+        { "prefer-ipv6", no_argument, nullptr, '6' },
+        { "verbose", no_argument, nullptr, 'v' },
+        { "frontend", no_argument, nullptr, 'f' },
+        { "version", no_argument, nullptr, 'V' },
+        { 0, 0, 0, 0 }
+    };
+
+    while (1) {
+        int option_index = 0;
+        c = getopt_long(argc, argv, "Vd:k:h:p:i:46vf", long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+        case 'V':
+            print_version();
+            exit(EXIT_SUCCESS);
+            break;
+
+        case 'd':
+            config.wg_device_name = std::string(optarg);
+            device_set = true;
+            break;
+
+        case 'k':
+            if (wg_key_from_base64(peer_pubkey, optarg) < 0) {
+                std::perror("Invalid peer public key");
+                exit(EXIT_FAILURE);
+            }
+            std::memcpy(config.wg_peer_pubkey, peer_pubkey, sizeof(wg_key));
+            config.wg_peer_pubkey_base64 = std::string(optarg);
+            pubkey_set = true;
+            break;
+
+        case 'h':
+            config.peer_hostname = std::string(optarg);
+            host_set = true;
+            break;
+
+        case 'p':
+            port = std::strtoul(optarg, &int_end_ptr, 10);
+            if (*int_end_ptr != '\0' || port > 65535) {
+                std::fprintf(stderr, "%s is not a valid port\n", optarg);
+                exit(EXIT_FAILURE);
+            }
+            config.peer_port = port;
+            port_set = true;
+            break;
+
+        case 'i':
+            interval = std::strtoul(optarg, &int_end_ptr, 10);
+            if (*int_end_ptr != '\0') {
+                std::fprintf(stderr, "%s is not a valid interval\n", optarg);
+                exit(EXIT_FAILURE);
+            }
+            config.refresh_interval_ms = interval;
+            break;
+
+        case '4':
+            config.prefer_ipv4 = true;
+            break;
+
+        case '6':
+            if (config.prefer_ipv4) {
+                fprintf(stderr, "Can't prefer both v4 and v6\n");
+                exit(EXIT_FAILURE);
+            }
+            config.prefer_ipv4 = false;
+            break;
+
+        case 'v':
+            config.verbose = true;
+            break;
+
+        case 'f':
+            config.frontend = true;
+            fprintf(stderr, "Running in frontend\n");
+            break;
+
+        case '?':
+            break;
+
+        default:
+            fprintf(stderr, "?? getopt returned character code 0%o ??\n", c);
+            break;
+        }
+    }
+
+    if (optind < argc) {
+        fprintf(stderr, "excess argument%s: ", argc - optind > 1 ? "s" : "");
+        while (optind < argc)
+            fprintf(stderr, "%s ", argv[optind++]);
+        fprintf(stderr, "\n");
+    }
+
+    if (!device_set) {
+        fprintf(stderr, "wireguard device is required\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!pubkey_set) {
+        fprintf(stderr, "wireguard peer public key is required\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!host_set) {
+        fprintf(stderr, "peer hostname is required\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (!port_set) {
+        fprintf(stderr, "port is required\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
 int main(int argc, char **argv)
 {
-    openlog("wg-autodns", LOG_PERROR, LOG_DAEMON);
+    std::signal(SIGINT, sigint_handler);
 
-    const char *peer_pubkey_b64 = "7wPZD1C9uVV4LSutzPdg6Egxp+F9b7Wdl/edki0VXgs=";
-    wg_key peer_pubkey;
+    ResolvUpdateConfig config = {
+        .prefer_ipv4 = true,
+        .refresh_interval_ms = 1000,
+    };
 
-    if (wg_key_from_base64(peer_pubkey, peer_pubkey_b64) < 0) {
-        perror("Invalid public key");
-    }
-    std::vector<sockaddr_storage> addrs;
-    int rc = resolve_dns("mirrors.ustc.edu.cn", addrs);
-
-    for (const auto &addr : addrs) {
-        char str[INET6_ADDRSTRLEN];
-        std::cout << inet_ntop(addr.ss_family, &reinterpret_cast<const sockaddr_in *>(&addr)->sin_addr, str, INET6_ADDRSTRLEN)
-                  << std::endl;
+    parse_args(argc, argv, config);
+    if (config.frontend) {
+        openlog(argv[0], LOG_PERROR, LOG_DAEMON);
+    } else {
+        openlog(argv[0], 0, LOG_USER);
     }
 
-    rc = update_peer_ip("wgdns", &peer_pubkey, addrs, 22222);
+    if (config.verbose) {
+        setlogmask(LOG_UPTO(LOG_DEBUG));
+    } else {
+        setlogmask(LOG_UPTO(LOG_INFO));
+    }
+
+    task_resolve_and_update(config);
 
     return 0;
 }

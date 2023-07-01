@@ -2,6 +2,7 @@
 #define CORE_H
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <arpa/inet.h>
@@ -10,9 +11,19 @@
 
 #include "wireguard.h"
 
-int update_peer_ip(const char *if_name, const wg_key *peer_pubkey,
-    const std::vector<sockaddr_storage> &addresses, std::uint16_t port);
+struct ResolvUpdateConfig {
+    std::string wg_device_name;
+    std::string wg_peer_pubkey_base64;
+    wg_key wg_peer_pubkey;
+    std::string peer_hostname;
+    std::uint16_t peer_port;
+    bool prefer_ipv4;
+    std::uint64_t refresh_interval_ms;
+    bool verbose;
+    bool frontend;
+};
 
-int resolve_dns(const char *peer_dns, std::vector<sockaddr_storage> &addresses);
+void task_resolve_and_update(const ResolvUpdateConfig &config);
+void sigint_handler(int);
 
 #endif
