@@ -9,8 +9,7 @@ jobs:
   build:
     strategy:
       matrix:
-        target: [ linux-x64 ]
-#         target: [ linux-x64, linux-x86, linux-arm64-lts, linux-arm64-musl, linux-armv7-lts, linux-armv7l-musl, linux-mips-lts, linux-mipsel-lts ]
+        target: [ linux-x64, linux-x86, linux-arm64-lts, linux-arm64-musl, linux-armv7-lts, linux-armv7l-musl, linux-mips-lts, linux-mipsel-lts ]
     runs-on: ubuntu-latest
     container:
       image: dockcross/${{matrix.target}}
@@ -24,13 +23,25 @@ jobs:
 
     - name: Build
       run: cmake --build build --config Release
-    - run: pwd
-    
-    - run: ls build
+      
+    - name: Zip
+      run: cd build && zip wg-peer-resolv-update-${{matrix.target}}.zip wg-peer-resolv-update && cd ..
 
     - name: Archive
       uses: actions/upload-artifact@v3
       with:
-        name: bin-${{matrix.target}}
-        path: build/wg-peer-resolv-update
+        name: bin
+        path: build/*.zip
         if-no-files-found: error
+  publish:
+    needs: build
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: bin
+          path: .
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "*.zip"
