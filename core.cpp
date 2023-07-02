@@ -265,7 +265,7 @@ void task_resolve_and_update(const ResolvUpdateConfig &config)
 {
     syslog(LOG_INFO, "Starting resolve and update task...");
     syslog(LOG_INFO, "Target WireGuard device %s, peer key %s", config.wg_device_name.c_str(), config.wg_peer_pubkey_base64.c_str());
-    syslog(LOG_INFO, "target hostname %s, target port %u, endpoint preference: %s", config.peer_hostname.c_str(), config.peer_port, get_ip_version_preference_str(config.ip_version_preference));
+    syslog(LOG_INFO, "Target hostname %s, target port %u, endpoint preference: %s", config.peer_hostname.c_str(), config.peer_port, get_ip_version_preference_str(config.ip_version_preference));
 
     int rc = 0;
     while (true) {
