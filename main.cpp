@@ -23,11 +23,11 @@ void print_help_long_and_exit(const char *me)
     std::fprintf(stderr,
         "Periodically checks and updates WireGuard peer endpoint IP against hostname."
         "\n"
-        "   -d, --device        the WireGuard device which has the peer whose endpoint is to be updated\n"
+        "   -d, --device        the WireGuard device with the peer whose endpoint is to be updated\n"
         "   -k, --pubkey        the public key of the peer whose endpoint is to be updated\n"
         "   -h, --hostname      the hostname of the peer endpoint, which will be periodically resolved\n"
         "   -p, --port          the port of the endpoint\n"
-        "   -i, --interval      the interval between hostname resolution\n"
+        "   -i, --interval      the interval between hostname resolution, in milliseconds\n"
         "   -4, --prefer-ipv4   prefer IPv4\n"
         "   -6, --prefer-ipv6   prefer IPv6\n"
         "   -D, --debug         Enable debug logging\n"
